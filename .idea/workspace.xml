@@ -4,33 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="20922e10-712e-4459-8162-b149d83a123d" name="Changes" comment="added all files">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.streamlit/secrets.toml.example" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Dockerfile" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Templates.iml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/app.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/build_templates.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/checkstyle-idea.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/core.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/jpa-buddy.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/requirements.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/akt.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/dogovor.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/pril1_perechen.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/pril2_zadanie.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/schet.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/soglasie_pd.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/tochka_akt.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/tochka_prilozhenie.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/templates/tochka_schet_oferta.docx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/test_run.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/ydisk.py" beforeDir="false" />
+    <list default="true" id="20922e10-712e-4459-8162-b149d83a123d" name="Changes" comment="added newest">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build_templates.py" beforeDir="false" afterPath="$PROJECT_DIR$/build_templates.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/core.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ydisk.py" beforeDir="false" afterPath="$PROJECT_DIR$/ydisk.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,31 +24,32 @@
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="3EzXiQKaZ3pehxAHk9SPxhGrIK1" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "SONARLINT_PRECOMMIT_ANALYSIS": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/Dima/study java/Templates/.idea",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.diffblue.cover.intellij",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;SONARLINT_PRECOMMIT_ANALYSIS&quot;: &quot;true&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Dima/study java/Templates/.idea&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.diffblue.cover.intellij&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\Dima\study java\Templates\.idea" />
@@ -88,7 +70,10 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1781182497922</updated>
-      <workItem from="1781182499345" duration="615000" />
+      <workItem from="1781182499345" duration="1310000" />
+      <workItem from="1781283694764" duration="53000" />
+      <workItem from="1781283758361" duration="46000" />
+      <workItem from="1781283810262" duration="367000" />
     </task>
     <task id="LOCAL-00001" summary="com">
       <option name="closed" value="true" />
@@ -106,7 +91,23 @@
       <option name="project" value="LOCAL" />
       <updated>1781182617510</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="drops useless">
+      <option name="closed" value="true" />
+      <created>1781183176752</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1781183176752</updated>
+    </task>
+    <task id="LOCAL-00004" summary="added newest">
+      <option name="closed" value="true" />
+      <created>1781183210768</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1781183210768</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -115,6 +116,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="com" />
     <MESSAGE value="added all files" />
-    <option name="LAST_COMMIT_MESSAGE" value="added all files" />
+    <MESSAGE value="drops useless" />
+    <MESSAGE value="added newest" />
+    <option name="LAST_COMMIT_MESSAGE" value="added newest" />
   </component>
 </project>
