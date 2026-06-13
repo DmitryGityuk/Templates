@@ -60,11 +60,10 @@ for set_name, исп in исполнители.items():
                         комплект=set_name, user="Олег")
     print(номер, "->", [os.path.basename(p) for p in paths])
 
-# нумерация по префиксам
-assert core.next_contract_number("СЗ") == "СЗ-2"
-assert core.next_contract_number("ИП") == "ИП-2"
-assert core.next_contract_number("ЮЛ") == "ЮЛ-2"
-print("Нумерация по префиксам: ОК")
+# номера в журнале сохраняются как есть (нумерация ручная, без префиксов)
+nums = core.journal_numbers()
+assert "СЗ-1" in nums  # это просто значения из теста выше
+print("Журнал хранит введённые номера: ОК")
 
 # архив: меняем ОГРН Ромашки -> старая версия в архив, потом возвращаем
 ром = dict(исполнители["ЮЛ"], огрн="1217700000000")

@@ -9,6 +9,10 @@ import requests
 
 API = "https://cloud-api.yandex.net/v1/disk"
 
+# Имя папки внутри templates/, которая считается «единственным комплектом»
+# для варианта без выбора (app_single). Должно совпадать с core.SINGLE_SET.
+SINGLE_SET = "Самозанятые"
+
 
 class YDiskError(RuntimeError):
     pass
@@ -109,23 +113,49 @@ class YDisk:
         return j.get("public_url", "")
 
     # ------------------------------------------------------------- сценарии
-    def bootstrap(self, local_tpl_dir):
-        """Создает структуру папок и докладывает на Диск недостающие комплекты
-        шаблонов (существующее на Диске НЕ перезаписывается — правки целы).
-        Папки, начинающиеся с «_», на Диск не выгружаются (архив)."""
+    def bootstrap(self, local_tpl_dir, multi=True):
+        """Создает структуру папок и докладывает на Диск недостающие шаблоны
+        (существующее на Диске НЕ перезаписывается — правки целы).
+
+        multi=True  — комплекты раскладываются по подпапкам Шаблоны/<Комплект>/.
+        multi=False — один комплект кладётся плоско в Шаблоны/ (без выбора).
+        Источник для single — папка SINGLE_SET внутри local_tpl_dir.
+        Папки и файлы, начинающиеся с «_», на Диск не выгружаются."""
         self.ensure_path(self.base + "/Шаблоны")
         self.ensure_path(self.base + "/Документы")
-        for set_name in sorted(os.listdir(local_tpl_dir)):
-            local_set = os.path.join(local_tpl_dir, set_name)
-            if set_name.startswith("_") or not os.path.isdir(local_set):
-                continue
-            remote_set = f"{self.base}/Шаблоны/{set_name}"
-            self.mkdir(remote_set)
-            have = {n for n, t in (self.listdir(remote_set) or [])}
-            for fname in sorted(os.listdir(local_set)):
+        if multi:
+            for set_name in sorted(os.listdir(local_tpl_dir)):
+                local_set = os.path.join(local_tpl_dir, set_name)
+                if set_name.startswith("_") or not os.path.isdir(local_set):
+                    continue
+                remote_set = f"{self.base}/Шаблоны/{set_name}"
+                self.mkdir(remote_set)
+                have = {n for n, t in (self.listdir(remote_set) or [])}
+                for fname in sorted(os.listdir(local_set)):
+                    if fname not in have:
+                        self.upload_file(os.path.join(local_set, fname),
+                                         remote_set + "/" + fname)
+        else:
+            src = os.path.join(local_tpl_dir, SINGLE_SET)
+            if not os.path.isdir(src):
+                return
+            have = {n for n, t in (self.listdir(self.base + "/Шаблоны") or [])}
+            for fname in sorted(os.listdir(src)):
                 if fname not in have:
-                    self.upload_file(os.path.join(local_set, fname),
-                                     remote_set + "/" + fname)
+                    self.upload_file(os.path.join(src, fname),
+                                     self.base + "/Шаблоны/" + fname)
+
+    def list_flat_files(self):
+        """docx прямо в Шаблоны/ (для варианта с одним комплектом)."""
+        items = self.listdir(self.base + "/Шаблоны") or []
+        return sorted(n for n, t in items if t == "file" and n.endswith(".docx"))
+
+    def fetch_flat(self, filename, fallback_dir):
+        data = self.download(f"{self.base}/Шаблоны/{filename}")
+        if data is None:
+            with open(os.path.join(fallback_dir, SINGLE_SET, filename), "rb") as f:
+                data = f.read()
+        return data
 
     def list_sets(self):
         """Имена папок-комплектов на Диске."""

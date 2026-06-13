@@ -420,6 +420,7 @@ def build_context(d):
 # ----------------------------------------------------------------------------
 TPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 MANIFEST = "манифест.json"
+SINGLE_SET = "Самозанятые"  # комплект по умолчанию для варианта без выбора
 
 
 def local_sets():
@@ -517,7 +518,24 @@ def _norm(v):
 
 
 def party_key(p):
-    return (_digits(p.get("инн")), _norm(p.get("тип")))
+    return _digits(p.get("инн"))
+
+
+_STATUS = {"самозанятый", "ип", "юл"}  # значимые для раздельных записей статусы
+_STATUS_LABEL = {"Самозанятый", "ИП", "ЮЛ"}  # как выбирается тип комплекта
+
+
+def _same_party(a, b):
+    """Та же запись: совпадает ИНН. Тип-статус (самозанятый/ИП/ЮЛ) различает
+    записи только если у обеих сторон он задан из этого набора и различается —
+    это сценарий смены статуса. Организационные формы (АО, ООО и пр.) и пустой
+    тип на совпадение по ИНН не влияют."""
+    if party_key(a) != party_key(b) or not party_key(a):
+        return False
+    ta, tb = _norm(a.get("тип")).lower(), _norm(b.get("тип")).lower()
+    if ta in _STATUS and tb in _STATUS and ta != tb:
+        return False
+    return True
 
 
 def _open_db():
@@ -554,20 +572,23 @@ def load_parties():
 
 
 def find_party(p):
-    """Текущая запись с тем же ИНН и типом (или None)."""
-    key = party_key(p)
-    if not key[0]:
+    """Текущая запись с тем же ИНН (или None). См. _same_party про смену статуса."""
+    if not party_key(p):
         return None
     for q in load_parties():
-        if party_key(q) == key:
+        if _same_party(q, p):
             return q
     return None
 
 
 def party_diff(old, new):
-    """[(поле, было, стало)] по значимым отличиям."""
+    """[(поле, было, стало)] по значимым отличиям. Поле «тип» не сравниваем:
+    смена налогового статуса уже разводится в отдельную запись (_same_party),
+    а смена ярлыка формы (АО↔ЮЛ из разных мест ввода) изменением не считается."""
     out = []
     for k in PARTY_COLS:
+        if k == "тип":
+            continue
         a, b = _norm(old.get(k)), _norm(new.get(k))
         if a != b and (a or b):
             out.append((k, a or "—", b or "—"))
@@ -582,16 +603,20 @@ def save_party(p, user="", overwrite=True):
         return "skipped"
     wb = _open_db()
     ws, wa = wb["Контрагенты"], wb["Архив"]
-    key = party_key(p)
     for row in ws.iter_rows(min_row=2):
         cur = _row_to_party([c.value for c in row])
-        if party_key(cur) == key:
+        if _same_party(cur, p):
             if not party_diff(cur, p):
                 return "same"
             if not overwrite:
                 return "skipped"
             stamp = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
             wa.append([cur.get(c, "") for c in PARTY_COLS] + [stamp, user])
+            # тип не перезаписываем «вслепую»: если в форме пусто или общий ярлык
+            # (ЮЛ), а в базе был осмысленный (АО/ООО) — оставляем прежний
+            new_type = _norm(p.get("тип"))
+            if not new_type or (new_type.lower() == "юл" and _norm(cur.get("тип"))):
+                p = dict(p, тип=cur.get("тип"))
             for i, c in enumerate(PARTY_COLS):
                 row[i].value = _norm(p.get(c))
             wb.save(DB_PATH)
@@ -603,7 +628,6 @@ def save_party(p, user="", overwrite=True):
 
 def party_history(p):
     """Версии контрагента из «Архива», новые сверху."""
-    key = party_key(p)
     out = []
     if not os.path.exists(DB_PATH):
         return out
@@ -612,7 +636,7 @@ def party_history(p):
         if not any(r):
             continue
         rec = dict(zip(ARCHIVE_COLS, [_norm(v) for v in r]))
-        if party_key(rec) == key:
+        if _same_party(rec, p):
             out.append(rec)
     return list(reversed(out))
 
