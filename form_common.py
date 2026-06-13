@@ -218,19 +218,15 @@ def document_fields(with_vat):
                               format="DD.MM.YYYY", key="окончание")
 
     st.subheader("Услуги / работы")
-    st.caption("Сумма строки = количество × цена, итог считается сам. "
-               "Даты заполнять не обязательно.")
+    st.caption("Сумма строки = количество × цена, итог считается сам.")
     услуги_df = st.data_editor(
-        [{"наименование": "", "колво": 1, "цена": 0.0, "начало": None,
-          "окончание": None}],
+        [{"наименование": "", "колво": 1, "цена": 0.0}],
         num_rows="dynamic", use_container_width=True, key="услуги",
         column_config={
             "наименование": st.column_config.TextColumn("Наименование", width="large"),
             "колво": st.column_config.NumberColumn("Кол-во", min_value=0, format="%g"),
             "цена": st.column_config.NumberColumn("Цена, руб.", min_value=0.0,
                                                   format="%.2f"),
-            "начало": st.column_config.DateColumn("Начало", format="DD.MM.YYYY"),
-            "окончание": st.column_config.DateColumn("Окончание", format="DD.MM.YYYY"),
         })
 
     st.subheader("Условия")

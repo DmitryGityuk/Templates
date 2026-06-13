@@ -54,13 +54,24 @@ def fetch(set_name, files):
     return out
 
 
+def _on_set_change():
+    """Смена комплекта: убираем поля исполнителя от прошлого типа, чтобы
+    не «прилипали», и сбрасываем подставленного контрагента-исполнителя."""
+    for k in list(st.session_state.keys()):
+        if k.startswith("i_") and k != "i_pick":
+            st.session_state.pop(k, None)
+    st.session_state.pop("i_pick", None)
+    st.session_state.pop("i_snapshot", None)
+
+
 sets = load_sets()
 if not sets:
     st.error("Не найдено ни одного комплекта шаблонов (папки в «Шаблоны/»).")
     st.stop()
 
 cset, ctest = st.columns([4, 1])
-set_name = cset.selectbox("📁 Комплект шаблонов", list(sets.keys()), key="set_pick")
+set_name = cset.selectbox("📁 Комплект шаблонов", list(sets.keys()), key="set_pick",
+                          on_change=_on_set_change)
 m = sets[set_name]
 KIND = m["тип_исполнителя"]
 cset.caption(f"Исполнитель: {KIND}" + (" · с НДС" if m["ндс"] else ""))
