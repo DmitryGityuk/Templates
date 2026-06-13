@@ -120,9 +120,15 @@ class YDisk:
         multi=True  — комплекты раскладываются по подпапкам Шаблоны/<Комплект>/.
         multi=False — один комплект кладётся плоско в Шаблоны/ (без выбора).
         Источник для single — папка SINGLE_SET внутри local_tpl_dir.
-        Папки и файлы, начинающиеся с «_», на Диск не выгружаются."""
+        Папки и файлы, начинающиеся с «_», на Диск не выгружаются.
+
+        Если локальной папки-источника нет (шаблоны не залиты в репозиторий) —
+        создаём только структуру папок и выходим: шаблоны в этом случае ведутся
+        прямо на Диске, локальный резерв не обязателен."""
         self.ensure_path(self.base + "/Шаблоны")
         self.ensure_path(self.base + "/Документы")
+        if not local_tpl_dir or not os.path.isdir(local_tpl_dir):
+            return  # нет локального резерва — работаем только с Диском
         if multi:
             for set_name in sorted(os.listdir(local_tpl_dir)):
                 local_set = os.path.join(local_tpl_dir, set_name)

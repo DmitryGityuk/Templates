@@ -52,19 +52,27 @@ def get_disk():
 
 
 def connect_disk(disk, multi):
-    """Первое подключение: проверка токена, структура папок, скачивание базы."""
+    """Первое подключение: проверка токена, структура папок, скачивание базы.
+    Сбой bootstrap (например, нет локального резерва) не должен ронять связь."""
     if disk and "yd_status" not in st.session_state:
         try:
             st.session_state["yd_status"] = disk.check()
+        except Exception as e:
+            st.session_state["yd_status"] = None
+            st.session_state["yd_error"] = str(e)
+            return False
+        try:
             disk.bootstrap(core.TPL_DIR, multi=multi)
+        except Exception as e:
+            st.session_state["yd_error"] = f"шаблоны: {e}"  # не критично
+        try:
             data = disk.download(disk.base + "/контрагенты.xlsx")
             if data:
                 with open(core.DB_PATH, "wb") as f:
                     f.write(data)
             st.session_state["db_synced"] = True
         except Exception as e:
-            st.session_state["yd_status"] = None
-            st.session_state["yd_error"] = str(e)
+            st.session_state["yd_error"] = f"база: {e}"
     return bool(disk and st.session_state.get("yd_status"))
 
 
