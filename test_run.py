@@ -44,7 +44,9 @@ for set_name, исп in исполнители.items():
     m = core.read_manifest(open(f"templates/{set_name}/манифест.json", "rb").read(),
                            set_name)
     номер = core.next_contract_number(m["префикс"])
-    d = {"договор_номер": номер, "договор_дата": datetime.date(2026, 6, 12),
+    d = {"прил_номер": номер, "прил_дата": datetime.date(2026, 6, 12),
+         "счет_номер": номер, "счет_дата": datetime.date(2026, 6, 12),
+         "акт_номер": номер, "акт_дата": datetime.date(2026, 7, 10),
          "город": "Екатеринбург", "услуги_начало": datetime.date(2026, 6, 15),
          "услуги_окончание": datetime.date(2026, 7, 10),
          "заказчик": зак, "исполнитель": исп,

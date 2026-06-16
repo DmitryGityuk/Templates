@@ -55,12 +55,13 @@ def fetch(set_name, files):
 
 
 def _on_set_change():
-    """Смена комплекта: убираем поля исполнителя от прошлого типа, чтобы
-    не «прилипали», и сбрасываем подставленного контрагента-исполнителя."""
-    for k in list(st.session_state.keys()):
-        if k.startswith("i_") and k != "i_pick":
-            st.session_state.pop(k, None)
-    st.session_state.pop("i_pick", None)
+    """Смена комплекта: убираем поля исполнителя текущего поколения, чтобы
+    набор полей нового типа не смешивался со старыми значениями."""
+    g = st.session_state.get("form_gen", 0)
+    for key in list(st.session_state.keys()):
+        if key.startswith("i_") and key.endswith(f"__g{g}") and key != fc.k("i_pick"):
+            st.session_state.pop(key, None)
+    st.session_state.pop(fc.k("i_pick"), None)
     st.session_state.pop("i_snapshot", None)
 
 
@@ -88,16 +89,16 @@ with col_i:
     исполнитель = fc.party_form("i", f"Исполнитель ({KIND})", KIND,
                                 parties, labels, filler)
 
-f = fc.document_fields(m["ндс"])
+f = fc.document_fields(m["ндс"], files=m["files"])
 
 st.subheader("Какие документы сгенерировать")
 dcols = st.columns(max(len(m["files"]), 1))
 выбранные = [fn for i, fn in enumerate(m["files"])
              if dcols[i].checkbox(os.path.splitext(fn)[0], True,
-                                  key=f"doc_{set_name}_{fn}")]
+                                  key=fc.k(f"doc_{set_name}_{fn}"))]
 
 st.checkbox("Сохранить контрагентов в базу и записать в журнал", True,
-            key="сохранить")
+            key=fc.k("сохранить"))
 
 
 def gen(choices):

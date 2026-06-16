@@ -19,13 +19,29 @@ def get_secret(name, default=""):
     return os.environ.get(name, default)
 
 
+def form_gen():
+    return st.session_state.get("form_gen", 0)
+
+
+def k(name):
+    """Ключ виджета с «поколением» формы. Меняя поколение (request_clear),
+    мы заставляем Streamlit создать свежие виджеты с дефолтами — это надёжно
+    очищает форму на любой версии Streamlit, в т.ч. в облаке."""
+    return f"{name}__g{form_gen()}"
+
+
 def _apply_pending_clear():
-    """Очистка выполняется В НАЧАЛЕ прогона (до создания виджетов), иначе
-    Streamlit восстановит значения из value=. Ставим флаг -> rerun -> чистим."""
+    """Очистка = увеличить поколение формы и стереть старые ключи полей.
+    Делать в начале прогона, до создания виджетов."""
     if st.session_state.pop("_do_clear", False):
-        for k in list(st.session_state.keys()):
-            if k not in KEEP_KEYS:
-                st.session_state.pop(k, None)
+        g = st.session_state.get("form_gen", 0)
+        # удаляем все ключи прошлого поколения и снапшоты/конфликты
+        for key in list(st.session_state.keys()):
+            if key.endswith(f"__g{g}") or key in (
+                    "z_snapshot", "i_snapshot", "pending_conflicts", "set_pick"):
+                if key not in KEEP_KEYS:
+                    st.session_state.pop(key, None)
+        st.session_state["form_gen"] = g + 1
 
 
 def request_clear():
@@ -165,11 +181,11 @@ FIELDS_BY_KIND = {
 
 def make_filler(parties, labels):
     def _fill(role):
-        pick = st.session_state.get(f"{role}_pick")
+        pick = st.session_state.get(k(f"{role}_pick"))
         if pick in labels:
             p = parties[labels.index(pick)]
-            for k, v in p.items():
-                st.session_state[f"{role}_{k}"] = v
+            for fld, v in p.items():
+                st.session_state[k(f"{role}_{fld}")] = v
             st.session_state[f"{role}_snapshot"] = dict(p)   # что подставили из базы
         else:
             st.session_state.pop(f"{role}_snapshot", None)
@@ -179,7 +195,7 @@ def make_filler(parties, labels):
 def party_form(role, title, kind, parties, labels, filler):
     st.subheader(title)
     st.selectbox("📇 Подставить сохранённого контрагента",
-                 ["— ввести вручную —"] + labels, key=f"{role}_pick",
+                 ["— ввести вручную —"] + labels, key=k(f"{role}_pick"),
                  on_change=filler, args=(role,))
     snap = st.session_state.get(f"{role}_snapshot")
     if snap and role == "i" and snap.get("тип") and snap["тип"] != kind \
@@ -190,38 +206,71 @@ def party_form(role, title, kind, parties, labels, filler):
             (snap.get("тип") if snap else "ЮЛ")}
     show = FIELDS_BY_KIND.get(kind, FIELDS_BY_KIND["ЮЛ"]) if role == "i" \
         else FIELDS_BY_KIND["ЮЛ"]
-    for k, label, hint in PARTY_FIELDS:
-        if k in show:
-            data[k] = st.text_input(label, key=f"{role}_{k}", placeholder=hint)
+    for fld, label, hint in PARTY_FIELDS:
+        if fld in show:
+            data[fld] = st.text_input(label, key=k(f"{role}_{fld}"), placeholder=hint)
     # подсветка отличий от ПОДСТАВЛЕННОЙ записи (а не от любой по ИНН)
     base = snap if (snap and core._same_party(snap, data)) else None
     if base:
         diff = core.party_diff(base, data)
         if diff:
             st.caption("✏️ Отличается от выбранной записи: " +
-                       ", ".join(k for k, _, _ in diff))
+                       ", ".join(fld for fld, _, _ in diff))
     return data
 
 
 # ----------------------------------------------------------------- общие поля
-def document_fields(with_vat):
-    st.subheader("Документ")
-    c1, c2, c3, c4, c5 = st.columns(5)
-    номер = c1.text_input("Номер", key="номер", placeholder="например, 12 или 7/2026")
-    дата = c2.date_input("Дата", value=datetime.date.today(), format="DD.MM.YYYY",
-                         key="дата")
-    город = c3.text_input("Город", value="Екатеринбург", key="город")
-    начало = c4.date_input("Работы: начало", value=datetime.date.today(),
-                           format="DD.MM.YYYY", key="начало")
-    окончание = c5.date_input("Работы: окончание",
+def _doc_keys(files):
+    """Сопоставляет файлы комплекта с типами документов для отдельных полей.
+    Возвращает список (тип, человеческое_имя, имя_файла) для приложения/счёта/акта."""
+    out = []
+    for fn in files:
+        low = os.path.splitext(fn)[0].lower()
+        if "приложен" in low:
+            out.append(("прил", "Приложение к договору", fn))
+        elif "счёт" in low or "счет" in low or "оферт" in low:
+            out.append(("счет", "Счёт-оферта", fn))
+        elif "акт" in low:
+            out.append(("акт", "Акт сдачи-приёмки", fn))
+        else:
+            # незнакомый документ — даём ему общий номер/дату «договора»
+            out.append(("дог", os.path.splitext(fn)[0], fn))
+    return out
+
+
+def document_fields(with_vat, files=None):
+    files = files or []
+    docmap = _doc_keys(files)
+
+    st.subheader("Общие сведения")
+    g1, g2, g3 = st.columns(3)
+    город = g1.text_input("Город", value="Екатеринбург", key=k("город"))
+    начало = g2.date_input("Работы: начало", value=datetime.date.today(),
+                           format="DD.MM.YYYY", key=k("начало"))
+    окончание = g3.date_input("Работы: окончание",
                               value=datetime.date.today() + datetime.timedelta(days=30),
-                              format="DD.MM.YYYY", key="окончание")
+                              format="DD.MM.YYYY", key=k("окончание"))
+
+    st.subheader("Номера и даты документов")
+    st.caption("У каждого документа свой номер и дата — заполните только нужные.")
+    номера = {}   # тип -> номер, тип -> дата (ключи NN_<тип>, DD_<тип>)
+    seen = []
+    for тип, имя, _ in docmap:
+        if тип in seen:
+            continue
+        seen.append(тип)
+        cc1, cc2, _ = st.columns([2, 2, 1])
+        номера[f"{тип}_номер"] = cc1.text_input(f"№ — {имя}", key=k(f"num_{тип}"),
+                                                placeholder="например, 12")
+        номера[f"{тип}_дата"] = cc2.date_input(f"Дата — {имя}",
+                                               value=datetime.date.today(),
+                                               format="DD.MM.YYYY", key=k(f"date_{тип}"))
 
     st.subheader("Услуги / работы")
     st.caption("Сумма строки = количество × цена, итог считается сам.")
     услуги_df = st.data_editor(
         [{"наименование": "", "колво": 1, "цена": 0.0}],
-        num_rows="dynamic", use_container_width=True, key="услуги",
+        num_rows="dynamic", use_container_width=True, key=k("услуги"),
         column_config={
             "наименование": st.column_config.TextColumn("Наименование", width="large"),
             "колво": st.column_config.NumberColumn("Кол-во", min_value=0, format="%g"),
@@ -232,37 +281,31 @@ def document_fields(with_vat):
     st.subheader("Условия")
     u1, u2 = st.columns(2)
     блок_ис = u1.checkbox("Пункт об интеллектуальной собственности", True,
-                          key="блок_ис",
+                          key=k("блок_ис"),
                           help="Снимите, если объектов ИС в работах не возникает")
     ндс_ставка = 0
     if with_vat:
-        ндс_ставка = u2.number_input("Ставка НДС, %", 0, 30, 20, key="ндс_ставка")
+        ндс_ставка = u2.number_input("Ставка НДС, %", 0, 30, 20, key=k("ндс_ставка"))
 
-    with st.expander("Дополнительные поля (приложение, счёт-оферта)"):
-        t1, t2 = st.columns(2)
-        прил_номер = t1.text_input("№ приложения к договору", value="1",
-                                   key="прил_номер")
-        прил_дата = t2.date_input("Дата приложения", value=datetime.date.today(),
-                                  format="DD.MM.YYYY", key="прил_дата")
+    with st.expander("Дополнительные поля счёта-оферты"):
         оферта_оплата = st.text_input(
-            "Срок оплаты аванса", key="оферта_оплата",
+            "Срок оплаты аванса", key=k("оферта_оплата"),
             value="в течение 5 (пяти) рабочих дней с даты выставления Счета")
         оферта_срок = st.text_input(
-            "Срок выполнения работ", key="оферта_срок",
+            "Срок выполнения работ", key=k("оферта_срок"),
             value="в течение 10 (десяти) рабочих дней с даты внесения аванса")
-        оферта_результат = st.text_input("Результат работ", key="оферта_результат",
+        оферта_результат = st.text_input("Результат работ", key=k("оферта_результат"),
                                          value="результат работ, указанных в Счете")
-        оферта_формат = st.text_input("Формат передачи результата", key="оферта_формат",
+        оферта_формат = st.text_input("Формат передачи результата", key=k("оферта_формат"),
                                       value="ссылкой на облачное хранилище")
         ндс_строка = st.text_input("Строка НДС (пусто = автоматически)", value="",
-                                   key="ндс_строка")
+                                   key=k("ндс_строка"))
     return {
-        "номер": номер, "дата": дата, "город": город, "начало": начало,
-        "окончание": окончание, "услуги_df": услуги_df, "блок_ис": блок_ис,
-        "ндс_ставка": ндс_ставка, "прил_номер": прил_номер, "прил_дата": прил_дата,
+        "город": город, "начало": начало, "окончание": окончание,
+        "услуги_df": услуги_df, "блок_ис": блок_ис, "ндс_ставка": ндс_ставка,
         "оферта_оплата": оферта_оплата, "оферта_срок": оферта_срок,
         "оферта_результат": оферта_результат, "оферта_формат": оферта_формат,
-        "ндс_строка": ндс_строка,
+        "ндс_строка": ндс_строка, **номера,
     }
 
 
@@ -273,15 +316,20 @@ def assemble(f, заказчик, исполнитель):
             continue
         услуги.append({k: (None if v is None or str(v) in ("NaT", "nan") else v)
                        for k, v in u.items()})
+    # номера/даты по типам документов (что не заполнено — останется пустым)
+    данные_док = {}
+    for тип in ("прил", "счет", "акт", "дог"):
+        if f"{тип}_номер" in f:
+            данные_док[f"{тип}_номер"] = (f.get(f"{тип}_номер") or "").strip()
+            данные_док[f"{тип}_дата"] = f.get(f"{тип}_дата")
     data = {
-        "договор_номер": (f["номер"] or "").strip(), "договор_дата": f["дата"],
         "город": f["город"], "услуги_начало": f["начало"],
         "услуги_окончание": f["окончание"], "заказчик": заказчик,
         "исполнитель": исполнитель, "услуги": услуги, "блок_ис": f["блок_ис"],
-        "ндс_ставка": f["ндс_ставка"], "прил_номер": f["прил_номер"],
-        "прил_дата": f["прил_дата"], "оферта_срок_оплаты": f["оферта_оплата"],
+        "ндс_ставка": f["ндс_ставка"], "оферта_срок_оплаты": f["оферта_оплата"],
         "оферта_срок_работ": f["оферта_срок"], "оферта_результат": f["оферта_результат"],
         "оферта_формат": f["оферта_формат"], "ндс_строка": f["ндс_строка"] or None,
+        **данные_док,
     }
     return data, услуги
 
@@ -295,8 +343,13 @@ def generate_and_store(data, услуги, templates, set_name, disk, yd_ok, cho
 
     warnings = core.validate_party(заказчик, "Заказчик") + \
         core.validate_party(исполнитель, "Исполнитель")
-    if data["договор_номер"] and data["договор_номер"] in core.journal_numbers():
-        warnings.append(f"Номер {data['договор_номер']} уже встречался в журнале.")
+    seen_nums = set(core.journal_numbers())
+    for тип in ("прил", "счет", "акт", "дог"):
+        n = (data.get(f"{тип}_номер") or "").strip()
+        if n and n in seen_nums:
+            warnings.append(f"Номер {n} уже встречался в журнале.")
+
+    главный = core._primary_number(data) or datetime.date.today().strftime("%Y-%m-%d")
 
     tmp = tempfile.mkdtemp()
     try:
@@ -308,8 +361,7 @@ def generate_and_store(data, услуги, templates, set_name, disk, yd_ok, cho
 
         folder_name = url = ""
         if yd_ok:
-            ном = data["договор_номер"] or datetime.date.today().strftime("%Y-%m-%d")
-            folder_name = core.safe_name(f"{ном} — {исполнитель['наименование']}")
+            folder_name = core.safe_name(f"{главный} — {исполнитель['наименование']}")
             folder = f"{disk.base}/Документы/{folder_name}"
             try:
                 disk.ensure_path(folder)
@@ -320,7 +372,7 @@ def generate_and_store(data, услуги, templates, set_name, disk, yd_ok, cho
                 warnings.append(f"На Диск загрузить не удалось: {e}. Скачайте zip.")
                 folder_name = url = ""
 
-        if st.session_state.get("сохранить", True):
+        if st.session_state.get(k("сохранить"), True):
             for role, p in [("z", заказчик), ("i", исполнитель)]:
                 if choices.get(role) != "skip":
                     core.save_party(p, user=user)
@@ -330,14 +382,13 @@ def generate_and_store(data, услуги, templates, set_name, disk, yd_ok, cho
                                 комплект=set_name, user=user)
             push_db(disk, yd_ok)
 
-        ном = data["договор_номер"] or "без номера"
         st.session_state["результат"] = {
-            "text": f"Готово! {ном}: {len(paths)} док., сумма "
+            "text": f"Готово! {главный}: {len(paths)} док., сумма "
                     f"{core.money_fmt(data.get('стоимость') or 0)} руб. "
                     f"Форма очищена для следующего пакета.",
             "warnings": warnings, "folder": folder_name, "url": url,
             "zip": buf.getvalue(),
-            "zipname": core.safe_name(f"{ном} {исполнитель['наименование']}") + ".zip",
+            "zipname": core.safe_name(f"{главный} {исполнитель['наименование']}") + ".zip",
         }
         request_clear()
         st.rerun()
@@ -389,7 +440,7 @@ def conflict_or_generate(заказчик, исполнитель, gen_callback)
 
     if st.button("🚀 Сгенерировать пакет документов", type="primary",
                  use_container_width=True):
-        save_on = st.session_state.get("сохранить", True)
+        save_on = st.session_state.get(k("сохранить"), True)
         conflicts = find_conflicts(заказчик, исполнитель) if save_on else []
         if conflicts:
             st.session_state["pending_conflicts"] = conflicts
