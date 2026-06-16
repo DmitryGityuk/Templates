@@ -144,9 +144,16 @@ def show_result_panel():
     for w in res.get("warnings", []):
         st.warning(w)
     if res.get("url"):
-        st.markdown(f"📂 Пакет на Яндекс Диске: [{res['folder']}]({res['url']})")
+        st.markdown(f"📂 Папка на Яндекс Диске: [{res['folder']}]({res['url']})")
+        st.markdown("🔗 **Ссылка для отправки** (по ней документы откроет любой, "
+                    "кому вы её перешлёте):")
+        st.code(res["url"], language=None)   # поле с кнопкой «копировать» справа
+        if hasattr(st, "link_button"):
+            st.link_button("🔗 Открыть ссылку для отправки", res["url"],
+                           use_container_width=True)
     elif res.get("folder"):
-        st.markdown(f"📂 Пакет на Яндекс Диске: **{res['folder']}**")
+        st.markdown(f"📂 Пакет на Яндекс Диске: **{res['folder']}** "
+                    "(ссылка не создалась — скачайте архивом ниже)")
     st.download_button("⬇️ Скачать пакет (zip)", res["zip"], file_name=res["zipname"],
                        mime="application/zip", use_container_width=True,
                        key="dl_result")
