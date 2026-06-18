@@ -710,13 +710,15 @@ def ipul_reklama_doplata():
 
 def build_ipul():
     build_prilozhenie(SET_IPUL)
+    build_nda(SET_IPUL)
     ipul_raboty_avans(); ipul_raboty_doplata(); ipul_raboty_post()
     ipul_uslugi_avans(); ipul_uslugi_post()
     ipul_postavka_avans(); ipul_postavka_doplata(); ipul_postavka_post()
     ipul_integ_avans(); ipul_nativ_avans(); ipul_reklama_post(); ipul_reklama_doplata()
     # манифест с картой типов (все — счета) и флагом выбора ИП/ЮЛ
     files = sorted(os.listdir(os.path.join(BASE, SET_IPUL)))
-    docs = {f: ("прил" if f.startswith("Приложение") else "счет")
+    docs = {f: ("прил" if f.startswith("Приложение")
+                else "дог" if f.startswith("Соглашение") else "счет")
             for f in files if f.endswith(".docx")}
     man = {"тип_исполнителя": "ЮЛ", "ндс": False, "выбор_типа": True,
            "документы": docs}
@@ -1200,6 +1202,7 @@ def smz_obychny_schet():
 
 def build_smz():
     build_prilozhenie(SET_SMZ)
+    build_nda(SET_SMZ)
     smz_akt_raboty(); smz_akt_raboty_rb(); smz_akt_uslugi()
     smz_raboty_avans(); smz_raboty_doplata(); smz_raboty_post()
     smz_uslugi_avans(); smz_uslugi_doplata(); smz_uslugi_post()
@@ -1209,6 +1212,7 @@ def build_smz():
     files = [f for f in sorted(os.listdir(os.path.join(BASE, SET_SMZ)))
              if f.endswith(".docx")]
     docs = {f: ("прил" if f.startswith("Приложение")
+                else "дог" if f.startswith("Соглашение")
                 else "акт" if f.startswith("Акт") else "счет") for f in files}
     man = {"тип_исполнителя": "Самозанятый", "ндс": False, "выбор_типа": False,
            "документы": docs}
@@ -1245,16 +1249,28 @@ def sub_p(d, text):
     _add_runs(p, text)
 
 
-def build_nda():
+def build_nda(folder=None):
+    folder = folder or SET_NDA
     d = new_doc()
     P(d, "**СОГЛАШЕНИЕ**", center=True)
     P(d, "**о конфиденциальности и неразглашении информации**", center=True)
     head_table_simple_city(d)
     P(d)
-    # Преамбула с переменными сторон
-    P(d, "{{ исполнитель_фио }}, именуемое далее «Исполнитель», в лице "
-         "{{ исполнитель_подписант_род }}, действующего на основании "
-         "{{ исполнитель_основание_род }}, и")
+    # Преамбула: сторона «Исполнитель» — формулировка по типу исполнителя
+    marker(d, "{%p if исполнитель_тип == 'Самозанятый' %}")
+    P(d, "{{ исполнитель_фио }} (ИНН {{ исполнитель_инн }}), применяющий специальный "
+         "налоговый режим «Налог на профессиональный доход», именуемый(-ая) далее "
+         "«Исполнитель», с одной стороны, и")
+    marker(d, "{%p endif %}")
+    marker(d, "{%p if исполнитель_тип == 'ИП' %}")
+    P(d, "Индивидуальный предприниматель {{ исполнитель_фио }} (ОГРНИП "
+         "{{ исполнитель_огрн }}), именуемый далее «Исполнитель», с одной стороны, и")
+    marker(d, "{%p endif %}")
+    marker(d, "{%p if исполнитель_тип == 'ЮЛ' %}")
+    P(d, "{{ исполнитель_фио }} (ИНН/КПП {{ исполнитель_инн }}/{{ исполнитель_кпп }}), "
+         "именуемое далее «Исполнитель», в лице {{ исполнитель_подписант_род }}, "
+         "действующего на основании {{ исполнитель_основание_род }}, с одной стороны, и")
+    marker(d, "{%p endif %}")
     P(d, "{{ заказчик_наименование }}, именуемое далее «Компания», в лице "
          "{{ заказчик_подписант_род }}, действующей на основании "
          "{{ заказчик_основание_род }}, с другой стороны, совместно именуемые "
@@ -1383,12 +1399,7 @@ def build_nda():
     b.add_paragraph("_____________ / {{ заказчик_подписант_кратко }} /")
     set_widths(t, [9, 9])
 
-    save(d, SET_NDA, "Соглашение о конфиденциальности (НДА).docx")
-    man = {"тип_исполнителя": "ЮЛ", "ндс": False, "выбор_типа": False, "вид": "нда",
-           "документы": {"Соглашение о конфиденциальности (НДА).docx": "дог"}}
-    with open(os.path.join(BASE, SET_NDA, MANIFEST_NAME), "w",
-              encoding="utf-8") as f:
-        json.dump(man, f, ensure_ascii=False, indent=2)
+    save(d, folder, "Соглашение о конфиденциальности (НДА).docx")
 
 
 def head_table_simple_city(d):
@@ -1474,14 +1485,13 @@ def build_prilozhenie(folder):
 if __name__ == "__main__":
     import shutil
     # пересобрать все три комплекта с нуля
-    for s in (SET_SMZ, SET_IPUL, SET_NDA):
+    for s in (SET_SMZ, SET_IPUL):
         d = os.path.join(BASE, s)
         if os.path.isdir(d):
             shutil.rmtree(d)
     build_smz()
     build_ipul()
-    build_nda()
     print("Собраны комплекты:")
-    for s in (SET_SMZ, SET_IPUL, SET_NDA):
+    for s in (SET_SMZ, SET_IPUL):
         n = len([f for f in os.listdir(os.path.join(BASE, s)) if f.endswith(".docx")])
         print(f"  • {s}: {n} докум.")
