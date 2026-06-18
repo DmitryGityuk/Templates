@@ -75,6 +75,13 @@ set_name = cset.selectbox("📁 Комплект шаблонов", list(sets.ke
                           on_change=_on_set_change)
 m = sets[set_name]
 KIND = m["тип_исполнителя"]
+ВИД = m.get("вид", "обычный")
+
+# Переключатель ИП↔ЮЛ для объединённого комплекта
+if m.get("выбор_типа"):
+    KIND = cset.radio("Тип исполнителя", ["ИП", "ЮЛ"], horizontal=True,
+                      key=fc.wk("kind_choice"),
+                      help="ЮЛ — указывается КПП в реквизитах; ИП — без КПП")
 cset.caption(f"Исполнитель: {KIND}" + (" · с НДС" if m["ндс"] else ""))
 fc.check_set_button(ctest, set_name, m["files"], KIND, fetch)
 
@@ -89,7 +96,7 @@ with col_i:
     исполнитель = fc.party_form("i", f"Исполнитель ({KIND})", KIND,
                                 parties, labels, filler)
 
-f = fc.document_fields(m["ндс"], files=m["files"])
+f = fc.document_fields(m["ндс"], files=m["files"], вид=ВИД)
 
 st.subheader("Какие документы сгенерировать")
 dcols = st.columns(max(len(m["files"]), 1))
@@ -103,7 +110,7 @@ st.checkbox("Сохранить контрагентов в базу и запи
 
 def gen(choices):
     data, услуги = fc.assemble(f, заказчик, исполнитель)
-    if not услуги:
+    if ВИД != "нда" and not услуги:
         st.error("Добавьте хотя бы одну услугу/работу с наименованием."); return
     if not заказчик["наименование"] or not исполнитель["наименование"]:
         st.error("Заполните наименования Заказчика и Исполнителя."); return
@@ -111,7 +118,8 @@ def gen(choices):
         st.error("Отметьте хотя бы один документ."); return
     try:
         fc.generate_and_store(data, услуги, fetch(set_name, выбранные), set_name,
-                              disk, yd_ok, choices, заказчик, исполнитель)
+                              disk, yd_ok, choices, заказчик, исполнитель,
+                              doc_types=m.get("документы"))
     except Exception as e:
         st.error(str(e))
 
