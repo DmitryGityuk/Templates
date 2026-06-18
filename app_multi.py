@@ -96,7 +96,8 @@ with col_i:
     исполнитель = fc.party_form("i", f"Исполнитель ({KIND})", KIND,
                                 parties, labels, filler)
 
-f = fc.document_fields(m["ндс"], files=m["files"], вид=ВИД)
+f = fc.document_fields(m["ндс"], files=m["files"], вид=ВИД,
+                       doc_types=m.get("документы"))
 
 st.subheader("Какие документы сгенерировать")
 dcols = st.columns(max(len(m["files"]), 1))

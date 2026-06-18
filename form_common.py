@@ -230,25 +230,29 @@ def party_form(role, title, kind, parties, labels, filler):
 
 
 # ----------------------------------------------------------------- общие поля
-def _doc_keys(files):
-    """Сопоставляет файлы комплекта с типами документов для отдельных полей.
-    Возвращает список (тип, человеческое_имя, имя_файла) для приложения/счёта/акта."""
-    out = []
+_TYPE_LABEL = {"прил": "Приложение к договору", "счет": "Счёт-оферта",
+               "акт": "Акт", "дог": "Соглашение / договор"}
+
+
+def _doc_keys(files, doc_types=None):
+    """Группирует выбранные документы по типам (из манифеста) и возвращает
+    по одной паре полей на тип: [(тип, подпись, [файлы этого типа])].
+    Номер и дата типа применяются ко ВСЕМ документам этого типа."""
+    doc_types = doc_types or {}
+    order = ["прил", "счет", "акт", "дог"]
+    groups = {}
     for fn in files:
-        low = os.path.splitext(fn)[0].lower()
-        if "приложен" in low:
-            out.append(("прил", "Приложение к договору", fn))
-        elif "счёт" in low or "счет" in low or "оферт" in low:
-            out.append(("счет", "Счёт-оферта", fn))
-        elif "акт" in low:
-            out.append(("акт", "Акт сдачи-приёмки", fn))
-        else:
-            # незнакомый документ — даём ему общий номер/дату «договора»
-            out.append(("дог", os.path.splitext(fn)[0], fn))
-    return out
+        тип = doc_types.get(fn)
+        if not тип:  # запасной разбор по имени, если в манифесте нет
+            low = os.path.splitext(fn)[0].lower()
+            тип = ("прил" if "приложен" in low else
+                   "счет" if ("счёт" in low or "счет" in low or "оферт" in low) else
+                   "акт" if "акт" in low else "дог")
+        groups.setdefault(тип, []).append(fn)
+    return [(т, _TYPE_LABEL.get(т, т), groups[т]) for т in order if т in groups]
 
 
-def document_fields(with_vat, files=None, вид="обычный"):
+def document_fields(with_vat, files=None, вид="обычный", doc_types=None):
     files = files or []
 
     # ---- Режим НДА: своя короткая форма (без услуг/НДС/номеров счетов) ----
@@ -269,7 +273,7 @@ def document_fields(with_vat, files=None, вид="обычный"):
                 "оферта_оплата": "", "оферта_срок": "", "оферта_результат": "",
                 "оферта_формат": "", "вид": "нда"}
 
-    docmap = _doc_keys(files)
+    docmap = _doc_keys(files, doc_types)
 
     st.subheader("Общие сведения")
     g1, g2, g3 = st.columns(3)
@@ -281,20 +285,18 @@ def document_fields(with_vat, files=None, вид="обычный"):
                               format="DD.MM.YYYY", key=wk("окончание"))
 
     st.subheader("Номера и даты документов")
-    st.caption("У каждого документа свой номер и дата — заполните только нужные.")
+    st.caption("Один номер и дата на каждый ТИП документа. Если отмечено несколько "
+               "счетов — у всех будет номер и дата из строки «Счёт».")
     номера = {}
-    seen = []
-    for тип, имя, _ in docmap:
-        if тип in seen:
-            continue
-        seen.append(тип)
+    for тип, подпись, файлы in docmap:
         cc1, cc2, _ = st.columns([2, 2, 1])
-        номера[f"{тип}_номер"] = cc1.text_input(f"№ — {имя}", key=wk(f"num_{тип}"),
-                                                placeholder="например, 12")
-        номера[f"{тип}_дата"] = cc2.date_input(f"Дата — {имя}",
-                                               value=datetime.date.today(),
-                                               format="DD.MM.YYYY",
-                                               key=wk(f"date_{тип}"))
+        примечание = (f" (для всех: {len(файлы)} шт.)" if len(файлы) > 1 else "")
+        номера[f"{тип}_номер"] = cc1.text_input(
+            f"№ — {подпись}{примечание}", key=wk(f"num_{тип}"),
+            placeholder="например, 12")
+        номера[f"{тип}_дата"] = cc2.date_input(
+            f"Дата — {подпись}", value=datetime.date.today(),
+            format="DD.MM.YYYY", key=wk(f"date_{тип}"))
 
     st.subheader("Услуги / работы")
     st.caption("Сумма строки = количество × цена, итог считается сам.")
