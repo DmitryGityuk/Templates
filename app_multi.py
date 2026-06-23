@@ -63,6 +63,8 @@ def _on_set_change():
             st.session_state.pop(key, None)
     st.session_state.pop(fc.wk("i_pick"), None)
     st.session_state.pop("i_snapshot", None)
+    # сбросить выбранную категорию (у разных комплектов разные категории)
+    st.session_state.pop(fc.wk("category"), None)
 
 
 sets = load_sets()
@@ -89,6 +91,14 @@ parties = core.load_parties()
 labels = [f'{p["наименование"]} · ИНН {p["инн"] or "—"} · {p["тип"]}' for p in parties]
 filler = fc.make_filler(parties, labels)
 
+# --- Второй выпадающий список: категория документов ---
+категории, файлы_прил, файлы_нда = fc.categorize(m["files"])
+cat_names = list(категории.keys())
+выбор_кат = st.selectbox("Категория документов", cat_names,
+                         key=fc.wk("category"),
+                         help="Показываются документы только выбранной категории")
+файлы_категории = категории.get(выбор_кат, [])
+
 col_z, col_i = st.columns(2)
 with col_z:
     заказчик = fc.party_form("z", "Заказчик", "ЮЛ", parties, labels, filler)
@@ -96,14 +106,27 @@ with col_i:
     исполнитель = fc.party_form("i", f"Исполнитель ({KIND})", KIND,
                                 parties, labels, filler)
 
-f = fc.document_fields(m["ндс"], files=m["files"], вид=ВИД,
-                       doc_types=m.get("документы"))
-
 st.subheader("Какие документы сгенерировать")
-dcols = st.columns(max(len(m["files"]), 1))
-выбранные = [fn for i, fn in enumerate(m["files"])
-             if dcols[i].checkbox(os.path.splitext(fn)[0], True,
-                                  key=fc.wk(f"doc_{set_name}_{fn}"))]
+st.caption(f"Категория: {выбор_кат}. Приложение и НДА можно добавить к любому "
+           "пакету.")
+выбранные = []
+# документы выбранной категории
+dcols = st.columns(max(len(файлы_категории), 1))
+for i, fn in enumerate(файлы_категории):
+    if dcols[i].checkbox(os.path.splitext(fn)[0], True,
+                         key=fc.wk(f"doc_{set_name}_{fn}")):
+        выбранные.append(fn)
+# приложение и НДА — отдельными галочками, всегда доступны
+if файлы_прил or файлы_нда:
+    extra = st.columns(2)
+    for j, (lbl, fls) in enumerate([("Приложение к договору", файлы_прил),
+                                     ("Соглашение о конфиденциальности (НДА)", файлы_нда)]):
+        if fls and extra[j].checkbox(lbl, False,
+                                     key=fc.wk(f"extra_{set_name}_{fls[0]}")):
+            выбранные.extend(fls)
+
+f = fc.document_fields(m["ндс"], files=выбранные, вид=ВИД,
+                       doc_types=m.get("документы"), категория=выбор_кат)
 
 st.checkbox("Сохранить контрагентов в базу и записать в журнал", True,
             key=fc.wk("сохранить"))
@@ -122,7 +145,7 @@ def gen(choices):
                               disk, yd_ok, choices, заказчик, исполнитель,
                               doc_types=m.get("документы"))
     except Exception as e:
-        st.error(str(e))
+        st.error(core.scrub_pii(str(e)))
 
 
 fc.conflict_or_generate(заказчик, исполнитель, gen)

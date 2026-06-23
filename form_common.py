@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Общая логика формы для обоих вариантов (один комплект / выбор комплекта).
 Используется из app_single.py и app_multi.py."""
-import datetime, io, os, shutil, tempfile, zipfile
+import datetime, io, os, shutil, tempfile, zipfile, hmac, time
 import streamlit as st
 import core, ydisk
 
@@ -49,13 +49,47 @@ def request_clear():
 
 
 def password_gate():
+    """Вход по паролю с защитой от перебора и безопасным сравнением.
+    После 5 неверных попыток — блокировка на 5 минут (в рамках сессии)."""
     pw = get_secret("APP_PASSWORD")
-    if pw and not st.session_state.get("auth_ok"):
-        st.title("🔒 Генератор договоров")
-        if st.text_input("Пароль", type="password") == pw:
-            st.session_state["auth_ok"] = True
-            st.rerun()
+    if not pw or st.session_state.get("auth_ok"):
+        return
+
+    МАКС_ПОПЫТОК = 5
+    БЛОКИРОВКА_СЕК = 300
+
+    st.title("🔒 Генератор договоров")
+
+    # проверка активной блокировки
+    until = st.session_state.get("auth_lock_until", 0)
+    now = time.time()
+    if until and now < until:
+        осталось = int((until - now) // 60) + 1
+        st.error(f"Слишком много неверных попыток. Попробуйте через ~{осталось} мин.")
         st.stop()
+
+    введён = st.text_input("Пароль", type="password", key="auth_pw_input")
+    if st.button("Войти", key="auth_btn"):
+        # константное по времени сравнение (защита от timing-атак)
+        ok = hmac.compare_digest(str(введён), str(pw))
+        if ok:
+            st.session_state["auth_ok"] = True
+            st.session_state.pop("auth_fails", None)
+            st.session_state.pop("auth_lock_until", None)
+            st.session_state.pop("auth_pw_input", None)
+            st.rerun()
+        else:
+            fails = st.session_state.get("auth_fails", 0) + 1
+            st.session_state["auth_fails"] = fails
+            осталось_попыток = МАКС_ПОПЫТОК - fails
+            if осталось_попыток <= 0:
+                st.session_state["auth_lock_until"] = now + БЛОКИРОВКА_СЕК
+                st.session_state["auth_fails"] = 0
+                st.error("Слишком много неверных попыток. "
+                         f"Вход заблокирован на {БЛОКИРОВКА_СЕК // 60} мин.")
+            else:
+                st.error(f"Неверный пароль. Осталось попыток: {осталось_попыток}.")
+    st.stop()
 
 
 # ----------------------------------------------------------------- Диск
@@ -80,7 +114,7 @@ def connect_disk(disk, multi):
         try:
             disk.bootstrap(core.TPL_DIR, multi=multi)
         except Exception as e:
-            st.session_state["yd_error"] = f"шаблоны: {e}"  # не критично
+            st.session_state["yd_error"] = "шаблоны: " + core.scrub_pii(e)  # не критично
         try:
             data = disk.download(disk.base + "/контрагенты.xlsx")
             if data:
@@ -91,7 +125,7 @@ def connect_disk(disk, multi):
                 push_db(disk, True)
             st.session_state["db_synced"] = True
         except Exception as e:
-            st.session_state["yd_error"] = f"база: {e}"
+            st.session_state["yd_error"] = "база: " + core.scrub_pii(e)
     return bool(disk and st.session_state.get("yd_status"))
 
 
@@ -111,7 +145,7 @@ def push_db(disk, yd_ok):
         try:
             disk.upload_file(core.DB_PATH, disk.base + "/контрагенты.xlsx")
         except Exception as e:
-            st.warning(f"База сохранена локально, но не загрузилась на Диск: {e}")
+            st.warning("База сохранена локально, но не загрузилась на Диск: " + core.scrub_pii(e))
 
 
 def sidebar(disk, yd_ok):
@@ -234,6 +268,58 @@ _TYPE_LABEL = {"прил": "Приложение к договору", "счет
                "акт": "Акт", "дог": "Соглашение / договор"}
 
 
+def _category_of(fname):
+    """Категория документа по имени файла (для второго выпадающего списка)."""
+    low = os.path.splitext(fname)[0].lower()
+    if "приложен" in low:
+        return "прил"          # отдельная галочка, всегда доступна
+    if "соглашение" in low or "нда" in low:
+        return "нда"           # отдельная галочка, всегда доступна
+    if "акт" in low:
+        return "Акты"
+    if "реклам" in low or "натив" in low or "интеграц" in low:
+        return "Рекламная интеграция"
+    if "поставка" in low:
+        return "Поставка"
+    if "услуг" in low:
+        return "Услуги"
+    if "работ" in low:
+        return "Работы"
+    return "Счета"             # «Обычный счёт» и прочее
+
+
+# порядок категорий в выпадающем списке
+_CATEGORY_ORDER = ["Работы", "Услуги", "Поставка", "Рекламная интеграция",
+                   "Акты", "Счета"]
+
+
+def categorize(files):
+    """Делит документы комплекта на категории и отдельные (приложение, НДА).
+    Возвращает (categories: {имя: [файлы]}, приложение: [файлы], нда: [файлы])."""
+    cats, прил, нда = {}, [], []
+    for fn in files:
+        c = _category_of(fn)
+        if c == "прил":
+            прил.append(fn)
+        elif c == "нда":
+            нда.append(fn)
+        else:
+            cats.setdefault(c, []).append(fn)
+    ordered = {c: cats[c] for c in _CATEGORY_ORDER if c in cats}
+    return ordered, прил, нда
+
+
+# какие доп. поля показывать для каждой категории
+CATEGORY_FIELDS = {
+    "Работы": ["оплата", "срок", "результат", "формат", "аванс"],
+    "Услуги": ["оплата", "период", "место", "аванс"],
+    "Поставка": ["оплата", "срок_поставки", "аванс"],
+    "Рекламная интеграция": ["оплата", "размещение", "аванс"],
+    "Акты": ["основание"],
+    "Счета": ["оплата"],
+}
+
+
 def _doc_keys(files, doc_types=None):
     """Группирует выбранные документы по типам (из манифеста) и возвращает
     по одной паре полей на тип: [(тип, подпись, [файлы этого типа])].
@@ -252,7 +338,8 @@ def _doc_keys(files, doc_types=None):
     return [(т, _TYPE_LABEL.get(т, т), groups[т]) for т in order if т in groups]
 
 
-def document_fields(with_vat, files=None, вид="обычный", doc_types=None):
+def document_fields(with_vat, files=None, вид="обычный", doc_types=None,
+                    категория=None):
     files = files or []
 
     # ---- Режим НДА: своя короткая форма (без услуг/НДС/номеров счетов) ----
@@ -321,46 +408,87 @@ def document_fields(with_vat, files=None, вид="обычный", doc_types=Non
     аванс_процент = u3.number_input("Аванс, % (для «аванс+доплата»)", 0, 100, 50,
                                     key=wk("аванс_процент"))
 
-    with st.expander("Дополнительные поля документов (сроки, место, основание)"):
-        оферта_оплата = st.text_input(
-            "Срок оплаты", key=wk("оферта_оплата"), value="не позднее ______")
-        оферта_срок = st.text_input(
-            "Срок выполнения работ / поставки / период услуг", key=wk("оферта_срок"),
-            value="в течение 10 (десяти) рабочих дней с даты внесения аванса")
-        оферта_результат = st.text_input("Результат работ", key=wk("оферта_результат"),
-                                         value="результат работ, указанных в Счете")
-        оферта_формат = st.text_input("Формат передачи результата",
-                                      key=wk("оферта_формат"),
-                                      value="ссылкой на облачное хранилище")
-        c1, c2 = st.columns(2)
-        оферта_размещения = c1.text_input("Срок размещения (реклама)",
-                                          value="______", key=wk("оферта_размещения"))
-        оферта_отношения = c2.date_input("Отношения сторон с (дата)",
-                                          value=datetime.date.today(),
-                                          format="DD.MM.YYYY",
-                                          key=wk("оферта_отношения_с"),
-                                          help="Для постоплаты и НДА: дата, с которой "
-                                               "договор распространяет силу")
-        оферта_место = st.text_input(
-            "Место оказания услуг",
-            value="г. Екатеринбург, ул. Сакко и Ванцетти, д. 61",
-            key=wk("оферта_место"))
-        c3, c4 = st.columns(2)
-        осн_номер = c3.text_input("Основание — № договора (акт услуг)",
-                                  value="", key=wk("осн_номер"))
-        осн_дата = c4.date_input("Основание — дата", value=datetime.date.today(),
-                                 format="DD.MM.YYYY", key=wk("осн_дата"))
-        прил_оплата = st.text_area(
-            "Способ оплаты (для приложения, п. 3)", key=wk("прил_оплата"),
-            value="Заказчик обязуется оплатить Услуги в размере 100% их стоимости до "
-                  "начала оказания Услуг путем перечисления денежных средств на "
-                  "банковский счет Исполнителя на основании счета на оплату, "
-                  "выставленного Исполнителем. Акт оказанных услуг направляется "
-                  "Исполнителем Заказчику по факту оказания Услуг.",
-            help="Например: постоплата в течение 5 рабочих дней после подписания "
-                 "акта; или аванс 50% + доплата")
-        ндс_строка = st.text_input("Строка НДС (пусто = автоматически)", value="",
-                                   key=wk("ндс_строка"))
+    # какие доп. поля показывать для этой категории
+    show = set(CATEGORY_FIELDS.get(категория, [])) if категория else {
+        "оплата", "срок", "результат", "формат", "период", "место",
+        "размещение", "срок_поставки", "аванс", "основание"}
+    показать_прил = bool(files) and any("приложен" in str(x).lower() for x in files)
+    показать_нда = bool(files) and any(("соглашен" in str(x).lower()
+                                        or "нда" in str(x).lower()) for x in files)
+
+    with st.expander("Дополнительные поля документов", expanded=False):
+        DEF_ОПЛ = "не позднее ______"
+        DEF_СРОК = "в течение 10 (десяти) рабочих дней с даты внесения аванса"
+        DEF_РЕЗ = "результат работ, указанных в Счете"
+        DEF_ФМТ = "ссылкой на облачное хранилище"
+        DEF_МЕСТО = "г. Екатеринбург, ул. Сакко и Ванцетти, д. 61"
+        DEF_ПРИЛ = ("Заказчик обязуется оплатить Услуги в размере 100% их стоимости "
+                    "до начала оказания Услуг путем перечисления денежных средств на "
+                    "банковский счет Исполнителя на основании счета на оплату, "
+                    "выставленного Исполнителем. Акт оказанных услуг направляется "
+                    "Исполнителем Заказчику по факту оказания Услуг.")
+
+        if {"оплата", "оплата"} & show or "оплата" in show:
+            оферта_оплата = st.text_input("Срок оплаты", key=wk("оферта_оплата"),
+                                          value=DEF_ОПЛ)
+        else:
+            оферта_оплата = DEF_ОПЛ
+        if "срок" in show:
+            оферта_срок = st.text_input("Срок выполнения работ",
+                                        key=wk("оферта_срок"), value=DEF_СРОК)
+        elif "период" in show:
+            оферта_срок = st.text_input("Период оказания услуг",
+                                        key=wk("оферта_срок"), value=DEF_СРОК)
+        elif "срок_поставки" in show:
+            оферта_срок = st.text_input("Срок поставки товара",
+                                        key=wk("оферта_срок"), value=DEF_СРОК)
+        else:
+            оферта_срок = DEF_СРОК
+        if "результат" in show:
+            оферта_результат = st.text_input("Результат работ",
+                                             key=wk("оферта_результат"), value=DEF_РЕЗ)
+            оферта_формат = st.text_input("Формат передачи результата",
+                                          key=wk("оферта_формат"), value=DEF_ФМТ)
+        else:
+            оферта_результат, оферта_формат = DEF_РЕЗ, DEF_ФМТ
+        if "размещение" in show:
+            оферта_размещения = st.text_input("Срок размещения (реклама)",
+                                              value="______",
+                                              key=wk("оферта_размещения"))
+        else:
+            оферта_размещения = "______"
+        if "место" in show:
+            оферта_место = st.text_input("Место оказания услуг", value=DEF_МЕСТО,
+                                         key=wk("оферта_место"))
+        else:
+            оферта_место = DEF_МЕСТО
+        if "основание" in show:
+            c3, c4 = st.columns(2)
+            осн_номер = c3.text_input("Основание — № договора", value="",
+                                      key=wk("осн_номер"))
+            осн_дата = c4.date_input("Основание — дата",
+                                     value=datetime.date.today(),
+                                     format="DD.MM.YYYY", key=wk("осн_дата"))
+        else:
+            осн_номер, осн_дата = "", datetime.date.today()
+        # дата отношений — нужна для постоплаты и НДА (показываем всегда, она компактная)
+        оферта_отношения = st.date_input("Отношения сторон с (дата)",
+                                         value=datetime.date.today(),
+                                         format="DD.MM.YYYY",
+                                         key=wk("оферта_отношения_с"),
+                                         help="Для постоплаты и НДА: дата, с которой "
+                                              "договор распространяет силу")
+        # способ оплаты для приложения — только если выбрано приложение
+        if показать_прил:
+            прил_оплата = st.text_area(
+                "Способ оплаты (для приложения, п. 3)", key=wk("прил_оплата"),
+                value=DEF_ПРИЛ,
+                help="Например: постоплата в течение 5 рабочих дней после "
+                     "подписания акта; или аванс 50% + доплата")
+        else:
+            прил_оплата = DEF_ПРИЛ
+        ндс_строка = (st.text_input("Строка НДС (пусто = автоматически)", value="",
+                                    key=wk("ндс_строка")) if with_vat else "")
     return {
         "город": город, "начало": начало, "окончание": окончание,
         "услуги_df": услуги_df, "блок_ис": блок_ис, "ндс_ставка": ндс_ставка,
@@ -442,7 +570,7 @@ def generate_and_store(data, услуги, templates, set_name, disk, yd_ok, cho
                     disk.upload_file(p, folder + "/" + os.path.basename(p))
                 url = disk.publish(folder)
             except Exception as e:
-                warnings.append(f"На Диск загрузить не удалось: {e}. Скачайте zip.")
+                warnings.append("На Диск загрузить не удалось: " + core.scrub_pii(e) + ". Скачайте zip.")
                 folder_name = url = ""
 
         if st.session_state.get(wk("сохранить"), True):
