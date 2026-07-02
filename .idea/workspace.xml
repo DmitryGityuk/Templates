@@ -4,14 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="20922e10-712e-4459-8162-b149d83a123d" name="Changes" comment="added newest">
+    <list default="true" id="20922e10-712e-4459-8162-b149d83a123d" name="Changes" comment="added new form">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build_templates.py" beforeDir="false" afterPath="$PROJECT_DIR$/build_templates.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ydisk.py" beforeDir="false" afterPath="$PROJECT_DIR$/ydisk.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,6 +68,7 @@
       <workItem from="1781283694764" duration="53000" />
       <workItem from="1781283758361" duration="46000" />
       <workItem from="1781283810262" duration="367000" />
+      <workItem from="1782192179909" duration="1298000" />
     </task>
     <task id="LOCAL-00001" summary="com">
       <option name="closed" value="true" />
@@ -107,7 +102,15 @@
       <option name="project" value="LOCAL" />
       <updated>1781183210768</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="added new form">
+      <option name="closed" value="true" />
+      <created>1782192261356</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1782192261356</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -118,6 +121,7 @@
     <MESSAGE value="added all files" />
     <MESSAGE value="drops useless" />
     <MESSAGE value="added newest" />
-    <option name="LAST_COMMIT_MESSAGE" value="added newest" />
+    <MESSAGE value="added new form" />
+    <option name="LAST_COMMIT_MESSAGE" value="added new form" />
   </component>
 </project>
